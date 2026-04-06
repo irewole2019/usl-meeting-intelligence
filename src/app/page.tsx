@@ -1,14 +1,145 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { runPipeline } from '@/lib/pipeline';
-import type { MeetingType, MeetingMetadata } from '@/types';
+import type { MeetingType, MeetingMetadata, QualityResult } from '@/types';
 
 const MEETING_TYPES: { value: MeetingType; label: string; description: string }[] = [
   { value: 'sales_discovery', label: 'Sales Discovery', description: 'Needs, objections, next steps, quotes' },
   { value: 'customer_support', label: 'Customer Support', description: 'Issues, resolution, follow-up, sentiment' },
   { value: 'internal_sync', label: 'Internal Sync', description: 'Decisions, blockers, action items, owners' },
 ];
+
+interface ParsedQuote {
+  text: string;
+  speaker: string;
+  timestamp: string;
+}
+
+function parseQuotes(markdown: string): ParsedQuote[] {
+  const match = markdown.match(/## Key Quotes[\s]*\n([\s\S]*?)(?=\n## |$)/);
+  if (!match) return [];
+
+  const section = match[1].trim();
+  const quotes: ParsedQuote[] = [];
+
+  // Parse quotes: lines starting with - or > or numbered, with optional speaker/timestamp
+  const lines = section.split('\n').filter((l) => l.trim());
+
+  let currentQuote = '';
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // New quote line (starts with -, >, or number)
+    if (/^[-*>]|\d+\./.test(trimmed)) {
+      if (currentQuote) {
+        quotes.push(extractQuoteParts(currentQuote));
+      }
+      currentQuote = trimmed.replace(/^[-*>\d.]+\s*/, '');
+    } else if (currentQuote) {
+      currentQuote += ' ' + trimmed;
+    }
+  }
+  if (currentQuote) {
+    quotes.push(extractQuoteParts(currentQuote));
+  }
+
+  return quotes;
+}
+
+function extractQuoteParts(raw: string): ParsedQuote {
+  // Try to extract speaker and timestamp patterns like:
+  // "quote text" — Speaker Name [10:05]
+  // **Speaker Name** (10:05): "quote text"
+  // Speaker Name [10:05]: quote text
+  let speaker = '';
+  let timestamp = '';
+  let text = raw;
+
+  // Pattern: — Speaker [timestamp] or - Speaker (timestamp) at end
+  const endPattern = /\s*[—–-]\s*\*{0,2}([^[(*\n]+?)\*{0,2}\s*[\[(](\d{1,2}:\d{2}(?::\d{2})?)[\])]/;
+  const endMatch = text.match(endPattern);
+  if (endMatch) {
+    speaker = endMatch[1].trim();
+    timestamp = endMatch[2];
+    text = text.replace(endPattern, '').trim();
+  } else {
+    // Pattern: **Speaker** (timestamp): at start
+    const startPattern = /^\*{0,2}([^:*\n]+?)\*{0,2}\s*[\[(](\d{1,2}:\d{2}(?::\d{2})?)[\])]\s*:\s*/;
+    const startMatch = text.match(startPattern);
+    if (startMatch) {
+      speaker = startMatch[1].trim();
+      timestamp = startMatch[2];
+      text = text.replace(startPattern, '').trim();
+    }
+  }
+
+  // Clean up surrounding quotes
+  text = text.replace(/^[""]|[""]$/g, '').trim();
+
+  return { text, speaker, timestamp };
+}
+
+function QualityBadge({ quality }: { quality: QualityResult }) {
+  const color =
+    quality.score >= 80
+      ? 'bg-green-100 text-green-800'
+      : quality.score >= 60
+        ? 'bg-amber-100 text-amber-800'
+        : 'bg-red-100 text-red-800';
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}>
+      Quality: {quality.score} / 100
+    </span>
+  );
+}
+
+function QuoteCard({ quote }: { quote: ParsedQuote }) {
+  return (
+    <div className="border-l-4 border-blue-500 pl-4 py-3">
+      <p className="text-sm text-gray-800 italic leading-relaxed">&ldquo;{quote.text}&rdquo;</p>
+      {(quote.speaker || quote.timestamp) && (
+        <p className="text-xs text-gray-500 mt-2">
+          {quote.speaker && <span className="font-medium">{quote.speaker}</span>}
+          {quote.speaker && quote.timestamp && ' · '}
+          {quote.timestamp && <span>{quote.timestamp}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LoadingState({ current, total }: { current: number; total: number }) {
+  const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+
+  return (
+    <div className="mt-8 p-8 bg-gray-50 border border-gray-200 rounded-lg">
+      <div className="flex flex-col items-center gap-4">
+        {/* Spinner */}
+        <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+
+        <p className="text-sm text-gray-600 font-medium">
+          {total > 0
+            ? `Processing chunk ${current} of ${total}...`
+            : 'Preparing transcript...'}
+        </p>
+
+        {total > 0 && (
+          <div className="w-full max-w-xs">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   // Input state
@@ -31,6 +162,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [summaryMarkdown, setSummaryMarkdown] = useState<string | null>(null);
+  const [quality, setQuality] = useState<QualityResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +171,7 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      // File parsing wired in Phase 3 — for now just show the filename
+      // File parsing wired in Phase 3
     }
   };
 
@@ -47,6 +179,7 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     setSummaryMarkdown(null);
+    setQuality(null);
     setProgress({ current: 0, total: 0 });
 
     try {
@@ -65,19 +198,35 @@ export default function Home() {
       });
 
       setSummaryMarkdown(result);
-      console.log('Pipeline result:', result);
+
+      // Run quality check
+      try {
+        const qualityRes = await fetch('/api/quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ markdown: result }),
+        });
+        if (qualityRes.ok) {
+          const { result: qualityResult } = await qualityRes.json();
+          setQuality(qualityResult);
+        }
+      } catch {
+        // Quality check is non-blocking
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred';
       setError(message);
-      console.error('Pipeline error:', err);
     } finally {
       setIsGenerating(false);
     }
   };
 
+  const quotes = summaryMarkdown ? parseQuotes(summaryMarkdown) : [];
+  const highSeverityIssues = quality?.issues.filter((i) => i.severity === 'high') || [];
+
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className={`mx-auto px-6 py-12 ${summaryMarkdown ? 'max-w-6xl' : 'max-w-3xl'} transition-all`}>
         {/* Header */}
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Meeting Intelligence</h1>
         <p className="text-gray-500 mb-10">
@@ -243,11 +392,7 @@ export default function Home() {
           disabled={!transcript.trim() || isGenerating}
           className="w-full py-3.5 bg-blue-600 text-white font-semibold rounded-lg text-base hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          {isGenerating
-            ? progress.total > 0
-              ? `Processing chunk ${progress.current} of ${progress.total}...`
-              : 'Starting...'
-            : 'Generate Summary'}
+          {isGenerating ? 'Generating...' : 'Generate Summary'}
         </button>
 
         {/* Error Display */}
@@ -257,10 +402,58 @@ export default function Home() {
           </div>
         )}
 
-        {/* Summary Placeholder */}
-        {summaryMarkdown && (
-          <div className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-sm text-gray-500">Summary generated. Display coming in Phase 2, Session 2.</p>
+        {/* Loading State */}
+        {isGenerating && (
+          <LoadingState current={progress.current} total={progress.total} />
+        )}
+
+        {/* Summary Display */}
+        {summaryMarkdown && !isGenerating && (
+          <div className="mt-8">
+            {/* Quality Badge */}
+            <div className="flex justify-end mb-4">
+              {quality && <QualityBadge quality={quality} />}
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Left Column: Rendered Markdown */}
+              <div className="lg:w-[60%] min-w-0">
+                <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-200 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:text-gray-700">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {summaryMarkdown}
+                  </ReactMarkdown>
+                </div>
+              </div>
+
+              {/* Right Column: Key Quotes Panel */}
+              <div className="lg:w-[40%]">
+                <div className="sticky top-8">
+                  {/* Quality Warnings */}
+                  {highSeverityIssues.length > 0 && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-800 mb-1">Quality warnings</p>
+                      <ul className="space-y-1">
+                        {highSeverityIssues.map((issue, i) => (
+                          <li key={i} className="text-xs text-amber-700">{issue.description}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Key Quotes</h3>
+
+                  {quotes.length > 0 ? (
+                    <div className="space-y-4">
+                      {quotes.map((quote, i) => (
+                        <QuoteCard key={i} quote={quote} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No quotes extracted.</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

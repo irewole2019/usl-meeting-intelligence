@@ -37,6 +37,12 @@ Last updated: 2025-04-05
   - `src/app/page.tsx` — single-column layout with transcript textarea, file upload, 3 meeting type chips, collapsible metadata/chat sections, Generate button wired to pipeline
   - `next.config.mjs` — enabled asyncWebAssembly for tiktoken WASM support
   - `src/app/layout.tsx` and `globals.css` — cleaned up for Meeting Intelligence branding
+- **Phase 2, Session 2 complete:** Summary display and quote panel built
+  - Split view: 60% rendered markdown (react-markdown + remark-gfm + prose typography), 40% Key Quotes panel
+  - Quote cards parsed from markdown with speaker/timestamp, blue left border
+  - Quality badge (green/amber/red) with score, high-severity warning banner
+  - Loading state with spinner, progress bar, chunk progress message
+  - Quality checker wired: POST /api/quality called after pipeline completes
 
 ## Pre-Build Checklist Status
 
@@ -56,6 +62,6 @@ Last updated: 2025-04-05
 
 ## What Is Next
 
-1. **Phase 2, Session 2:** Build summary display and quote panel
-2. Phase 2, Session 3: Build export functions (copy markdown, download .md, copy email)
-3. Phase 2, Session 4: Full end-to-end smoke test
+1. **Phase 2, Session 3:** Build export functions (copy markdown, download .md, copy email)
+2. Phase 2, Session 4: Full end-to-end smoke test
+3. Phase 3, Session 1: Transcript file parsing (.vtt, .txt, .docx)
