@@ -33,6 +33,10 @@ Last updated: 2025-04-05
 - **Phase 1, Session 4 complete:** Quality checker API route and rule-based pre-check built
   - `src/lib/qualityCheck.ts` — rule-based pre-check catches missing sections, short output, excessive TBDs without model call
   - `src/app/api/quality/route.ts` — POST endpoint, runs pre-check first, calls OpenRouter for deeper review if no high-severity issues, merges and deduplicates results
+- **Phase 2, Session 1 complete:** Input page and template selector built
+  - `src/app/page.tsx` — single-column layout with transcript textarea, file upload, 3 meeting type chips, collapsible metadata/chat sections, Generate button wired to pipeline
+  - `next.config.mjs` — enabled asyncWebAssembly for tiktoken WASM support
+  - `src/app/layout.tsx` and `globals.css` — cleaned up for Meeting Intelligence branding
 
 ## Pre-Build Checklist Status
 
@@ -52,6 +56,6 @@ Last updated: 2025-04-05
 
 ## What Is Next
 
-1. **Phase 2, Session 1:** Build input page and template selector (`src/app/page.tsx`)
-2. Phase 2, Session 2: Build summary display and quote panel
-3. Phase 2, Session 3: Build export functions (copy markdown, download .md, copy email)
+1. **Phase 2, Session 2:** Build summary display and quote panel
+2. Phase 2, Session 3: Build export functions (copy markdown, download .md, copy email)
+3. Phase 2, Session 4: Full end-to-end smoke test
