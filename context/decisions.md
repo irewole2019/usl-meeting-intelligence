@@ -28,6 +28,14 @@ Architectural decisions and the reasoning behind them. Written once, never delet
 
 ---
 
+## 2025-04-06 — Switched dev model from Qwen 3.6 free to Gemini 2.5 Flash
+
+**Decision:** Changed `OPENROUTER_MODEL` from `qwen/qwen3.6-plus:free` to `google/gemini-2.5-flash-preview-05-20`.
+
+**Reason:** Qwen 3 free tier had aggressive rate limits (429 errors), slow responses, and wrapped output in `<think>` tags that required stripping. Gemini 2.5 Flash is ~$0.01-0.02 per 60-min transcript, very fast, reliable JSON output, and 1M context window. Will re-evaluate for production in Phase 4.
+
+---
+
 ## 2025-04-05 — Repo name: `usl-meeting-intelligence`
 
 **Decision:** GitHub repo named `usl-meeting-intelligence` under personal account (`irewole2019`), not under `uslsystems` org.
