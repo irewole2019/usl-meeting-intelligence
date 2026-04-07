@@ -9,8 +9,26 @@ interface ChunkRequest {
   meetingType: MeetingType;
 }
 
-const SYSTEM_PROMPT =
-  'You are a meeting analyst. Extract structured signals from the transcript excerpt below. Output only valid JSON matching this schema exactly. Do not include any preamble, explanation, or markdown formatting. Output raw JSON only. Do not wrap your response in any thinking tags. Schema: { "decisions": [{"text": string, "rationale": string}], "pain_points": [{"speaker": string, "text": string}], "action_items": [{"description": string, "owner": string, "due_date": string}], "quote_candidates": [{"speaker": string, "timestamp": string, "text": string, "signal_type": string}], "open_questions": [string] }';
+const MEETING_TYPE_EMPHASIS: Record<string, string> = {
+  sales_discovery: 'Prioritize: customer objections, stated needs, buying signals, competitive mentions, and next steps with clear owners.',
+  customer_support: 'Prioritize: the core issue, resolution steps taken, customer sentiment shifts, escalation risks, and follow-up commitments.',
+  internal_sync: 'Prioritize: decisions with owners, blockers, deadline changes, resource commitments, and accountability assignments.',
+};
+
+const SYSTEM_PROMPT = `You are a senior meeting analyst. Your job is to identify the FEW things that actually matter from this transcript excerpt — not everything that was said.
+
+Rules:
+- Extract only HIGH-SIGNAL items. If something is routine or filler, skip it.
+- Decisions: only extract explicit decisions where someone committed to a course of action. Max 3 per chunk.
+- Pain points: synthesize into one clear sentence per pain point. Do NOT paste raw transcript text. Max 3 per chunk.
+- Action items: only items where a specific person committed to do a specific thing. Max 3 per chunk.
+- Quotes: select ONLY quotes that reveal emotion, priority, strategy, or commitment. Max 30 words each. Max 3 per chunk.
+- Open questions: only unresolved items that need a future answer. Max 3 per chunk.
+
+Write each item as a single declarative sentence. Use active voice. Include the person's name where relevant.
+
+Output only valid JSON. No preamble, no markdown, no thinking tags.
+Schema: { "decisions": [{"text": string, "rationale": string}], "pain_points": [{"speaker": string, "text": string}], "action_items": [{"description": string, "owner": string, "due_date": string}], "quote_candidates": [{"speaker": string, "timestamp": string, "text": string, "signal_type": string}], "open_questions": [string] }`;
 
 function extractJson(raw: string): string {
   // Strip <think>...</think> blocks (Qwen 3 reasoning output)
@@ -63,7 +81,8 @@ export async function POST(request: NextRequest) {
       apiKey,
     });
 
-    const userMessage = `Meeting type: ${meetingType}\nChunk ${chunkIndex + 1} of ${totalChunks}:\n\n${chunk}`;
+    const emphasis = MEETING_TYPE_EMPHASIS[meetingType] || '';
+    const userMessage = `Meeting type: ${meetingType}\n${emphasis}\n\nChunk ${chunkIndex + 1} of ${totalChunks}:\n\n${chunk}`;
 
     const completion = await openai.chat.completions.create(
       {

@@ -13,9 +13,22 @@ interface QualityIssue {
   severity: 'high' | 'medium' | 'low';
 }
 
+const REQUIRED_SECTIONS = [
+  'Executive Summary',
+  'Key Decisions',
+  'Customer Needs and Pain Points',
+  'Objections, Risks, and Open Questions',
+  'Next Steps',
+  'Key Quotes',
+  'Meeting Outcomes',
+  'Follow-Up Email Draft',
+];
+
 function extractSection(markdown: string, heading: string): string | null {
+  // Escape special regex characters in heading
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
-    `^## ${heading}[\\s]*\\n([\\s\\S]*?)(?=^## |\\z)`,
+    `^## ${escaped}[\\s]*\\n([\\s\\S]*?)(?=^## |$)`,
     'm'
   );
   const match = markdown.match(pattern);
@@ -25,68 +38,70 @@ function extractSection(markdown: string, heading: string): string | null {
 export function runPreCheck(markdown: string): QualityResult {
   const issues: QualityIssue[] = [];
 
-  // Check total word count
+  // Check total word count — with tighter prompts, 200 is a reasonable floor
   const wordCount = markdown.split(/\s+/).filter(Boolean).length;
-  if (wordCount < 300) {
+  if (wordCount < 200) {
     issues.push({
       type: 'short_output',
-      description: `Summary is only ${wordCount} words (minimum expected: 300). Likely a failed generation.`,
+      description: `Summary is only ${wordCount} words (minimum expected: 200). Likely a failed generation.`,
       severity: 'high',
     });
   }
 
-  // Check ## Next Steps section
+  // Check all 8 required sections exist
+  for (const section of REQUIRED_SECTIONS) {
+    const content = extractSection(markdown, section);
+    if (content === null) {
+      const isHighSeverity = ['Executive Summary', 'Next Steps', 'Key Quotes', 'Follow-Up Email Draft'].includes(section);
+      issues.push({
+        type: `missing_section`,
+        description: `Missing ## ${section} section.`,
+        severity: isHighSeverity ? 'high' : 'medium',
+      });
+    }
+  }
+
+  // Check Next Steps for excessive TBDs
   const nextSteps = extractSection(markdown, 'Next Steps');
-  if (nextSteps === null) {
-    issues.push({
-      type: 'missing_next_steps',
-      description: 'Missing ## Next Steps section.',
-      severity: 'high',
-    });
-  } else {
+  if (nextSteps) {
     const tbdCount = (nextSteps.match(/\bTBD\b/g) || []).length;
-    if (tbdCount > 4) {
+    const rowCount = (nextSteps.match(/^\|(?!\s*-)/gm) || []).length - 1; // subtract header row
+    if (rowCount > 0 && tbdCount > Math.ceil(rowCount * 0.6)) {
       issues.push({
         type: 'excessive_tbd',
-        description: `Next Steps section contains ${tbdCount} TBD entries (maximum recommended: 4).`,
+        description: `${tbdCount} of ${rowCount} action items have TBD dates.`,
         severity: 'medium',
       });
     }
   }
 
-  // Check ## Key Quotes section
+  // Check Key Quotes has content
   const keyQuotes = extractSection(markdown, 'Key Quotes');
-  if (keyQuotes === null) {
-    issues.push({
-      type: 'missing_quotes',
-      description: 'Missing ## Key Quotes section.',
-      severity: 'high',
-    });
-  } else {
-    const quoteLines = keyQuotes
-      .split('\n')
-      .filter((l) => l.trim().length > 0);
+  if (keyQuotes !== null) {
+    const quoteLines = keyQuotes.split('\n').filter((l) => l.trim().length > 0);
     if (quoteLines.length < 2) {
       issues.push({
         type: 'weak_quote',
-        description: `Key Quotes section has only ${quoteLines.length} line(s) (minimum expected: 2).`,
+        description: `Key Quotes has only ${quoteLines.length} line(s) (expected at least 4 quotes).`,
         severity: 'high',
       });
     }
   }
 
-  // Check ## Key Decisions section
+  // Check Key Decisions has content
   const keyDecisions = extractSection(markdown, 'Key Decisions');
-  if (keyDecisions === null || keyDecisions.length === 0) {
+  if (keyDecisions !== null && keyDecisions.length === 0) {
     issues.push({
-      type: 'missing_decision',
-      description: 'Missing or empty ## Key Decisions section.',
+      type: 'empty_decisions',
+      description: 'Key Decisions section is empty.',
       severity: 'medium',
     });
   }
 
   const hasHighSeverity = issues.some((i) => i.severity === 'high');
-  const score = hasHighSeverity ? Math.max(0, 40 - issues.length * 10) : Math.max(50, 80 - issues.length * 10);
+  const score = hasHighSeverity
+    ? Math.max(0, 40 - issues.length * 10)
+    : Math.max(50, 90 - issues.length * 5);
 
   return {
     issues,
