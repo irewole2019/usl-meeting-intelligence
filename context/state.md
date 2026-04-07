@@ -58,13 +58,16 @@ Last updated: 2025-04-05
   - API key check on load via /api/health, disables Generate if missing
   - Network offline detection with "check your connection" message, form state preserved
   - Pipeline returns `{ markdown, warnings }` instead of raw string
+- **Phase 5, Sessions 1-2 complete:** Deployed to production
+  - Live at https://meeting.uslsystems.co
+  - Repo moved to https://github.com/usl-systems/usl-meeting-intelligence
 
 ## Pre-Build Checklist Status
 
 - [x] Claude Code installed and working
 - [x] OpenRouter account created
 - [x] OpenRouter API key generated and stored in `.env.local`
-- [ ] Qwen 3 model confirmed available on OpenRouter — using free tier (`qwen/qwen3.6-plus:free`) for dev
+- [x] Model set to Gemini 2.5 Flash (`google/gemini-2.5-flash`) via OpenRouter
 - [x] GitHub repository created and pushed
 - [x] Vercel account created and connected to GitHub
 - [x] Node.js v22.14.0 confirmed
@@ -77,7 +80,6 @@ Last updated: 2025-04-05
 
 ## What Is Next
 
-1. **Phase 4, Session 2:** Prompt tuning against real transcripts (started — prompts rewritten)
-2. Phase 5, Session 1: Vercel production deployment
-3. Phase 5, Session 2: Custom domain (meeting.uslsystems.co)
-4. Phase 5, Session 3: Production hardening (security headers, robots.txt, rate limiting, health check)
+1. **Phase 5, Session 3:** Production hardening (security headers, robots.txt, rate limiting)
+2. Phase 4, Session 2: Prompt tuning against more real transcripts
+3. v1.5: Company knowledge integration (see docs/company-knowledge-roadmap.md)

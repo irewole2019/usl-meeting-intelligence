@@ -40,7 +40,7 @@ Architectural decisions and the reasoning behind them. Written once, never delet
 
 **Decision:** GitHub repo named `usl-meeting-intelligence` under personal account (`irewole2019`), not under `uslsystems` org.
 
-**Reason:** Solo builder project. Can be transferred to the org repo later if needed.
+**Reason:** Solo builder project. Transferred to `usl-systems` org on 2025-04-06.
 
 ---
 
