@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { runPipeline } from '@/lib/pipeline';
 import { exportDocx } from '@/lib/exportDocx';
+import { parseFile } from '@/lib/fileParser';
 import type { MeetingType, MeetingMetadata, QualityResult } from '@/types';
 
 const MEETING_TYPES: { value: MeetingType; label: string; description: string }[] = [
@@ -166,13 +167,30 @@ export default function Home() {
   const [quality, setQuality] = useState<QualityResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // File parsing state
+  const [isParsingFile, setIsParsingFile] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      // File parsing wired in Phase 3
+    if (!file) return;
+
+    setFileName(file.name);
+    setFileError(null);
+    setIsParsingFile(true);
+
+    try {
+      const text = await parseFile(file);
+      setTranscript(text);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to parse file.';
+      setFileError(message);
+    } finally {
+      setIsParsingFile(false);
+      // Reset input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -299,9 +317,10 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                disabled={isParsingFile}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400"
               >
-                Upload file
+                {isParsingFile ? 'Reading file...' : 'Upload file'}
               </button>
               <input
                 ref={fileInputRef}
@@ -319,6 +338,9 @@ export default function Home() {
             placeholder="Paste your Teams meeting transcript here..."
             className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
           />
+          {fileError && (
+            <p className="mt-2 text-sm text-red-600">{fileError}</p>
+          )}
         </div>
 
         {/* Meeting Type Selector */}

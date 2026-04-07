@@ -47,6 +47,10 @@ Last updated: 2025-04-05
   - Export toolbar with 4 buttons: Copy Markdown, Download .md, Download .docx, Copy Email
   - `src/lib/exportDocx.ts` — structured DOCX export with headings, tables, bullet lists, metadata
   - Clipboard buttons show "Copied!" for 2 seconds, downloads use `meeting-summary-YYYY-MM-DD` naming
+- **Phase 2, Session 4 complete:** End-to-end smoke test passed with prompt rewrite
+- **Phase 3, Session 1 complete:** File parsing wired into UI
+  - `src/lib/fileParser.ts` — parses .vtt (speaker labels + timestamps), .txt (raw), .docx (mammoth)
+  - File upload populates transcript textarea, shows "Reading file..." while parsing, inline error on failure
 
 ## Pre-Build Checklist Status
 
@@ -66,6 +70,8 @@ Last updated: 2025-04-05
 
 ## What Is Next
 
-1. **Phase 2, Session 4:** Full end-to-end smoke test
-2. Phase 3, Session 1: Transcript file parsing (.vtt, .txt, .docx)
-3. Phase 3, Session 2: Summary export as .docx (already done — merged into Session 2.3)
+1. **Phase 4, Session 1:** Error handling and edge cases (retries, timeouts, transcript too long, offline)
+2. Phase 4, Session 2: Prompt tuning against real transcripts (started — prompts rewritten)
+3. Phase 5, Session 1: Vercel production deployment
+4. Phase 5, Session 2: Custom domain (meeting.uslsystems.co)
+5. Phase 5, Session 3: Production hardening (security headers, robots.txt, rate limiting, health check)

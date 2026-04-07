@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     let signals: ChunkSignals;
     try {
       signals = JSON.parse(cleaned);
-    } catch (parseErr) {
+    } catch {
       console.error('JSON parse failed. Raw content:', content);
       console.error('Cleaned content:', cleaned);
       return NextResponse.json(
