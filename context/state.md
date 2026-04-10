@@ -102,20 +102,23 @@ Last updated: 2025-04-05
   - Meeting type auto-detection from transcript keywords (sales/support/internal signals)
   - Summary history in localStorage (last 10), accessible via header dropdown
 
-- **Wave 4 (partial):** Make.com integration script
-  - `scripts/setup-make.ts` — auto-discovers team/connection, creates 2 scenarios with webhooks
-  - Scenarios: "MI – Save Summary to SharePoint" + "MI – Post Summary to Teams Channel"
-  - Set Variable maps meetingType to folder path (/Sales/, /Support/, /Internal/)
+- **Wave 4 complete:** Make.com integration
+  - `scripts/setup-make.ts` — auto-discovers team/connection, creates scenarios with webhooks
+  - Make.com scenarios live: SharePoint (Webhook → Upload .docx) + Teams (Webhook → Send Message)
   - "Send to SharePoint" and "Send to Teams" buttons in export toolbar
-  - Buttons POST structured JSON (meetingType, title, date, markdown, filename) to Make webhooks
-  - Teams: sends HTML-formatted summary (email draft excluded), includes meetingTypeLabel
-  - SharePoint: sends .docx as base64, decoded by Make into proper Word file
+  - Teams: HTML-formatted summary (email draft excluded), meeting type in title prefix
+  - SharePoint: .docx as base64, saved to Meeting Notes folder
   - Only appear when NEXT_PUBLIC_MAKE_*_WEBHOOK_URL env vars are configured
-  - Both scenarios live and tested
+
+- **Branding complete:** USL Systems identity
+  - USL logo in header and favicon (icon.png)
+  - Brand teal (#04BD98) accent across all components replacing default blue
+  - "Built by USL Systems" footer
+  - Teal selection highlight and focus rings
 
 ## What Is Next
 
-1. Wire SharePoint and Teams modules in Make.com scenarios (manual step in Make UI)
-2. Add "Send to SharePoint" / "Send to Teams" buttons in the app export toolbar
-3. Prompt tuning against more real transcripts (2.4)
+1. Add webhook URLs to Vercel env vars for production (NEXT_PUBLIC_MAKE_*_WEBHOOK_URL)
+2. Prompt tuning against more real transcripts (Wave 2.4)
+3. Dynamic SharePoint folder routing (currently one folder, filename prefix handles type)
 4. v1.5: Company knowledge integration (see docs/company-knowledge-roadmap.md)
