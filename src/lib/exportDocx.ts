@@ -238,8 +238,8 @@ export async function exportDocx(
     );
   }
 
-  // Sections
-  for (const section of sections) {
+  // Sections (exclude Follow-Up Email Draft — sent separately via Teams)
+  for (const section of sections.filter((s) => s.heading !== 'Follow-Up Email Draft')) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
