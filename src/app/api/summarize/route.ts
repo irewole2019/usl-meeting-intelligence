@@ -29,36 +29,63 @@ interface SummarizeRequest {
   metadata: MeetingMetadata;
   meetingType: MeetingType;
   chatLog?: string;
+  chunkCount?: number;
 }
 
-const SYSTEM_PROMPT = `You are a senior meeting summarizer. Produce a summary that someone can scan in 30 seconds and know exactly what happened, what was decided, and what they need to do.
+interface AdaptiveCaps {
+  execSummary: number;
+  decisions: number;
+  painPoints: number;
+  objections: number;
+  nextSteps: number;
+  quotes: number;
+  outcomes: number;
+}
+
+function getCaps(chunkCount: number): AdaptiveCaps {
+  if (chunkCount <= 2) {
+    return { execSummary: 3, decisions: 3, painPoints: 3, objections: 3, nextSteps: 5, quotes: 3, outcomes: 2 };
+  }
+  if (chunkCount <= 6) {
+    return { execSummary: 5, decisions: 5, painPoints: 5, objections: 5, nextSteps: 7, quotes: 4, outcomes: 3 };
+  }
+  if (chunkCount <= 12) {
+    return { execSummary: 7, decisions: 7, painPoints: 6, objections: 6, nextSteps: 10, quotes: 6, outcomes: 4 };
+  }
+  return { execSummary: 8, decisions: 8, painPoints: 7, objections: 7, nextSteps: 12, quotes: 8, outcomes: 5 };
+}
+
+function buildSystemPrompt(chunkCount: number): string {
+  const c = getCaps(chunkCount);
+
+  return `You are a senior meeting summarizer. Produce a summary that someone can scan in 30 seconds and know exactly what happened, what was decided, and what they need to do.
 
 Write in direct, declarative language. No filler phrases like "The team discussed..." or "It was mentioned that..." — go straight to the substance. Use active voice and present tense where possible.
 
 Output exactly these 8 sections in this order. Every section is mandatory — if nothing applies, write "None identified."
 
 ## Executive Summary
-Exactly 5 bullets. Each bullet is one sentence stating a concrete outcome, decision, or finding. Written for someone who was not in the meeting.
+${c.execSummary} bullets. Each bullet is one sentence stating a concrete outcome, decision, or finding. Written for someone who was not in the meeting.
 
 ## Key Decisions
-Max 5 decisions. Each as: **Decision** — one-sentence rationale (Decided by: Name).
+Max ${c.decisions} decisions. Each as: **Decision** — one-sentence rationale (Decided by: Name).
 Only include explicit commitments where someone chose a course of action. Do not include discussion topics or suggestions.
 
 ## Customer Needs and Pain Points
-Max 5 items. Synthesize each pain point into one clear sentence describing the underlying need or challenge. Do NOT paste raw transcript text. Attribute to the person who raised it.
+Max ${c.painPoints} items. Synthesize each pain point into one clear sentence describing the underlying need or challenge. Do NOT paste raw transcript text. Attribute to the person who raised it.
 
 ## Objections, Risks, and Open Questions
-Max 5 items. Each tagged as [Objection], [Risk], or [Open Question]. One sentence each. Only include items that need resolution — not rhetorical questions or settled matters.
+Max ${c.objections} items. Each tagged as [Objection], [Risk], or [Open Question]. One sentence each. Only include items that need resolution — not rhetorical questions or settled matters.
 
 ## Next Steps
 Markdown table: Owner | Action | Due Date.
-Max 7 rows. Each action must be specific and completable. Use actual dates where stated. Use "TBD" only when no date was mentioned. Do not include vague items like "discuss further."
+Max ${c.nextSteps} rows. Each action must be specific and completable. Use actual dates where stated. Use "TBD" only when no date was mentioned. Do not include vague items like "discuss further."
 
 ## Key Quotes
-Exactly 4 quotes. Each must be under 30 words. Select for signal: emotion, strategic intent, commitment, or pushback. Format: > "Quote text" — **Speaker Name**
+${c.quotes} quotes. Each must be under 30 words. Select for signal: emotion, strategic intent, commitment, or pushback. Format: > "Quote text" — **Speaker Name**
 
 ## Meeting Outcomes
-Max 3 bullets. State what materially changed: agreements reached, relationships shifted, directions set. Not a recap — only net-new outcomes.
+Max ${c.outcomes} bullets. State what materially changed: agreements reached, relationships shifted, directions set. Not a recap — only net-new outcomes.
 
 ## Follow-Up Email Draft
 Under 150 words. Professional, specific to this meeting. Open with a thank-you, summarize 2-3 key outcomes, list immediate next steps with owners, close with next meeting or check-in date if known.
@@ -68,6 +95,7 @@ Rules:
 - Never repeat content across sections. Quotes should not duplicate Key Decisions or Pain Points.
 - Every person mentioned as an owner must appear by full name, not pronoun.
 - Output clean markdown only. No JSON. No preamble. No commentary.`;
+}
 
 export async function POST(request: NextRequest) {
   // Rate limit check
@@ -81,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as SummarizeRequest;
-    const { chunkSignals, metadata, meetingType, chatLog } = body;
+    const { chunkSignals, metadata, meetingType, chatLog, chunkCount } = body;
 
     if (!chunkSignals?.length || !meetingType) {
       return NextResponse.json(
@@ -125,7 +153,7 @@ export async function POST(request: NextRequest) {
       {
         model: model || 'qwen/qwen3-235b-a22b',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: buildSystemPrompt(chunkCount || chunkSignals.length) },
           { role: 'user', content: userMessage },
         ],
         max_tokens: 3000,

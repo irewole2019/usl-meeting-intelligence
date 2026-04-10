@@ -138,6 +138,7 @@ export async function runPipeline({
         metadata,
         meetingType,
         chatLog: chatLog || undefined,
+        chunkCount: chunks.length,
       }),
     });
   } catch (err) {
