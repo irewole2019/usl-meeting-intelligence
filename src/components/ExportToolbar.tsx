@@ -44,12 +44,12 @@ export default function ExportToolbar({
   const getExportFilename = useCallback(
     (ext: string) => {
       const d = date || new Date().toISOString().slice(0, 10);
+      const prefix = meetingType === 'sales_discovery' ? 'SD' : meetingType === 'customer_support' ? 'CS' : 'IS';
       if (title) {
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        return `${slug}-${d}.${ext}`;
+        return `${prefix}-${slug}-${d}.${ext}`;
       }
-      const typeSlug = meetingType.replace(/_/g, '-');
-      return `${typeSlug}-${d}.${ext}`;
+      return `${prefix}-meeting-summary-${d}.${ext}`;
     },
     [date, title, meetingType]
   );
@@ -58,17 +58,6 @@ export default function ExportToolbar({
     await navigator.clipboard.writeText(markdown);
     toast('Markdown copied to clipboard');
   }, [markdown, toast]);
-
-  const handleDownloadMd = useCallback(() => {
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = getExportFilename('md');
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Downloaded ' + getExportFilename('md'));
-  }, [markdown, getExportFilename, toast]);
 
   const handleDownloadDocx = useCallback(async () => {
     const metadata: MeetingMetadata = {};
