@@ -105,7 +105,8 @@ Last updated: 2025-04-05
 - **Wave 4 (partial):** Make.com integration script
   - `scripts/setup-make.ts` — auto-discovers team/connection, creates 2 scenarios with webhooks
   - Scenarios: "MI – Save Summary to SharePoint" + "MI – Post Summary to Teams Channel"
-  - Next: wire OneDrive/Teams modules in Make.com UI, add "Send to Make" buttons in app
+  - Set Variable maps meetingType to folder path (/Sales/, /Support/, /Internal/)
+  - Next: add SharePoint/Teams modules in Make UI, add "Send" buttons in app
 
 ## What Is Next
 
