@@ -110,7 +110,7 @@ Last updated: 2025-04-05
 
 ## What Is Next
 
-1. Wire OneDrive and Teams modules in Make.com scenarios (manual step in Make UI)
+1. Wire SharePoint and Teams modules in Make.com scenarios (manual step in Make UI)
 2. Add "Send to SharePoint" / "Send to Teams" buttons in the app export toolbar
 3. Prompt tuning against more real transcripts (2.4)
 4. v1.5: Company knowledge integration (see docs/company-knowledge-roadmap.md)
