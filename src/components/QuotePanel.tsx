@@ -68,7 +68,7 @@ export function parseQuotes(markdown: string): ParsedQuote[] {
 
 function QuoteCard({ quote }: { quote: ParsedQuote }) {
   return (
-    <div className="border-l-4 border-blue-500 pl-4 py-3">
+    <div className="border-l-4 border-brand pl-4 py-3">
       <p className="text-sm text-gray-800 italic leading-relaxed">&ldquo;{quote.text}&rdquo;</p>
       {(quote.speaker || quote.timestamp) && (
         <p className="text-xs text-gray-500 mt-2">

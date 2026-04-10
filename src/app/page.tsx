@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import Image from 'next/image';
 import { runPipeline } from '@/lib/pipeline';
 import { parseFile } from '@/lib/fileParser';
 import { useToast } from '@/components/Toast';
@@ -319,11 +320,14 @@ export default function Home() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Meeting Intelligence</h1>
-            <p className="text-gray-500">
-              Paste a transcript, choose a meeting type, get a structured summary.
-            </p>
+          <div className="flex items-center gap-4">
+            <Image src="/logo.webp" alt="USL Systems" width={48} height={48} />
+            <div>
+              <h1 className="text-3xl font-bold text-brand-dark">Meeting Intelligence</h1>
+              <p className="text-gray-500 text-sm">
+                Paste a transcript, choose a meeting type, get a structured summary.
+              </p>
+            </div>
           </div>
           {/* 3.6 — History button */}
           {history.length > 0 && (
@@ -368,7 +372,7 @@ export default function Home() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isParsingFile}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400"
+                className="text-sm text-brand hover:text-brand-hover font-medium disabled:text-gray-400"
               >
                 {isParsingFile ? 'Reading file...' : 'Upload file'}
               </button>
@@ -385,11 +389,11 @@ export default function Home() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`relative ${isDragging ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg' : ''}`}
+            className={`relative ${isDragging ? 'ring-2 ring-brand ring-offset-2 rounded-lg' : ''}`}
           >
             {isDragging && (
-              <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center z-10">
-                <p className="text-sm font-medium text-blue-600">Drop file here</p>
+              <div className="absolute inset-0 bg-brand-light bg-opacity-90 border-2 border-dashed border-brand rounded-lg flex items-center justify-center z-10">
+                <p className="text-sm font-medium text-brand">Drop file here</p>
               </div>
             )}
             <textarea
@@ -397,7 +401,7 @@ export default function Home() {
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               placeholder="Paste your Teams meeting transcript here or drag & drop a .vtt, .txt, or .docx file..."
-              className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+              className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent resize-y"
             />
           </div>
           {fileError && <p className="mt-2 text-sm text-red-600">{fileError}</p>}
@@ -415,11 +419,11 @@ export default function Home() {
                 onClick={() => setMeetingType(type.value)}
                 className={`p-4 rounded-lg border-2 text-left transition-colors ${
                   meetingType === type.value
-                    ? 'border-blue-600 bg-blue-50'
+                    ? 'border-brand bg-brand-light'
                     : 'border-gray-200 hover:border-gray-300 bg-white'
                 }`}
               >
-                <div className={`text-sm font-semibold ${meetingType === type.value ? 'text-blue-700' : 'text-gray-900'}`}>
+                <div className={`text-sm font-semibold ${meetingType === type.value ? 'text-brand-hover' : 'text-gray-900'}`}>
                   {type.label}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">{type.description}</div>
@@ -440,19 +444,19 @@ export default function Home() {
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
               <div>
                 <label htmlFor="title" className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-                <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 Pipeline Review" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 Pipeline Review" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div>
                 <label htmlFor="date" className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-                <input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div>
                 <label htmlFor="attendees" className="block text-xs font-medium text-gray-600 mb-1">Attendees</label>
-                <input id="attendees" type="text" value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="Sarah Jones, Mark Chen, Lisa Park" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input id="attendees" type="text" value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="Sarah Jones, Mark Chen, Lisa Park" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div>
                 <label htmlFor="purpose" className="block text-xs font-medium text-gray-600 mb-1">Purpose</label>
-                <input id="purpose" type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Discuss Q3 targets" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input id="purpose" type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Discuss Q3 targets" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
               </div>
             </div>
           )}
@@ -471,7 +475,7 @@ export default function Home() {
               value={chatLog}
               onChange={(e) => setChatLog(e.target.value)}
               placeholder="Paste the Teams meeting chat here..."
-              className="mt-3 w-full min-h-[150px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+              className="mt-3 w-full min-h-[150px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent resize-y"
             />
           )}
         </div>
@@ -481,7 +485,7 @@ export default function Home() {
           type="button"
           onClick={handleGenerate}
           disabled={!transcript.trim() || isGenerating || !!configError}
-          className="w-full py-3.5 bg-blue-600 text-white font-semibold rounded-lg text-base hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="w-full py-3.5 bg-brand text-white font-semibold rounded-lg text-base hover:bg-brand-hover disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
           {isGenerating ? 'Generating...' : 'Generate Summary'}
         </button>
@@ -534,10 +538,10 @@ export default function Home() {
                   <textarea
                     value={editedMarkdown}
                     onChange={(e) => setEditedMarkdown(e.target.value)}
-                    className="w-full min-h-[600px] p-4 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                    className="w-full min-h-[600px] p-4 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand resize-y"
                   />
                 ) : (
-                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-200 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:text-gray-700">
+                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-200 prose-blockquote:border-l-blue-500 prose-blockquote:bg-brand-light prose-blockquote:py-1 prose-blockquote:text-gray-700">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {summaryMarkdown}
                     </ReactMarkdown>
@@ -555,6 +559,10 @@ export default function Home() {
           </div>
         )}
       </div>
+      {/* Footer */}
+      <footer className="border-t border-gray-100 mt-16 py-6 text-center text-xs text-gray-400">
+        Built by USL Systems
+      </footer>
     </main>
   );
 }

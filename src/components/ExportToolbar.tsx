@@ -216,7 +216,7 @@ export default function ExportToolbar({
             type="button"
             onClick={handleSendToSharePoint}
             disabled={sendingSharePoint}
-            className="px-3.5 py-2 text-sm font-medium border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+            className="px-3.5 py-2 text-sm font-medium border border-brand/40 rounded-lg text-brand-hover hover:bg-brand-light disabled:opacity-50 transition-colors"
           >
             {sendingSharePoint ? 'Sending...' : 'Send to SharePoint'}
           </button>
