@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import type { ChunkSignals, MeetingMetadata, MeetingType } from '@/types';
 
+// In-memory rate limiting — resets on server restart, sufficient for internal use
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
 interface SummarizeRequest {
   chunkSignals: ChunkSignals[];
   metadata: MeetingMetadata;
@@ -48,6 +70,15 @@ Rules:
 - Output clean markdown only. No JSON. No preamble. No commentary.`;
 
 export async function POST(request: NextRequest) {
+  // Rate limit check
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Maximum 10 summaries per hour.' },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = (await request.json()) as SummarizeRequest;
     const { chunkSignals, metadata, meetingType, chatLog } = body;
