@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useToast } from '@/components/Toast';
 import { exportDocx } from '@/lib/exportDocx';
 import type { MeetingMetadata, MeetingType, QualityResult } from '@/types';
 
@@ -38,7 +39,7 @@ export default function ExportToolbar({
   meetingType,
   onNewSummary,
 }: ExportToolbarProps) {
-  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
+  const { toast } = useToast();
 
   const getExportFilename = useCallback(
     (ext: string) => {
@@ -55,9 +56,8 @@ export default function ExportToolbar({
 
   const handleCopyMarkdown = useCallback(async () => {
     await navigator.clipboard.writeText(markdown);
-    setCopiedMarkdown(true);
-    setTimeout(() => setCopiedMarkdown(false), 2000);
-  }, [markdown]);
+    toast('Markdown copied to clipboard');
+  }, [markdown, toast]);
 
   const handleDownloadMd = useCallback(() => {
     const blob = new Blob([markdown], { type: 'text/markdown' });
@@ -67,7 +67,8 @@ export default function ExportToolbar({
     a.download = getExportFilename('md');
     a.click();
     URL.revokeObjectURL(url);
-  }, [markdown, getExportFilename]);
+    toast('Downloaded ' + getExportFilename('md'));
+  }, [markdown, getExportFilename, toast]);
 
   const handleDownloadDocx = useCallback(async () => {
     const metadata: MeetingMetadata = {};
@@ -81,40 +82,25 @@ export default function ExportToolbar({
     a.download = getExportFilename('docx');
     a.click();
     URL.revokeObjectURL(url);
-  }, [markdown, title, date, attendees, getExportFilename]);
+    toast('Downloaded ' + getExportFilename('docx'));
+  }, [markdown, title, date, attendees, getExportFilename, toast]);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200">
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={handleCopyMarkdown}
-          className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          {copiedMarkdown ? 'Copied!' : 'Copy Markdown'}
+        <button type="button" onClick={handleCopyMarkdown} className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+          Copy Markdown
         </button>
-        <button
-          type="button"
-          onClick={handleDownloadMd}
-          className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+        <button type="button" onClick={handleDownloadMd} className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
           Download .md
         </button>
-        <button
-          type="button"
-          onClick={handleDownloadDocx}
-          className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+        <button type="button" onClick={handleDownloadDocx} className="px-3.5 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
           Download .docx
         </button>
       </div>
       <div className="flex items-center gap-2">
         {quality && <QualityBadge quality={quality} />}
-        <button
-          type="button"
-          onClick={onNewSummary}
-          className="px-3.5 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-        >
+        <button type="button" onClick={onNewSummary} className="px-3.5 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
           New Summary
         </button>
       </div>

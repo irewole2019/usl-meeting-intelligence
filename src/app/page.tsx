@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { runPipeline } from '@/lib/pipeline';
 import { parseFile } from '@/lib/fileParser';
+import { useToast } from '@/components/Toast';
 import ExportToolbar from '@/components/ExportToolbar';
 import QuotePanel, { parseQuotes } from '@/components/QuotePanel';
 import EmailDraftPanel from '@/components/EmailDraftPanel';
@@ -12,6 +13,8 @@ import LoadingState from '@/components/LoadingState';
 import type { MeetingType, MeetingMetadata, QualityResult } from '@/types';
 
 const MAX_TRANSCRIPT_CHARS = 120000;
+const HISTORY_KEY = 'meeting-intelligence-history';
+const MAX_HISTORY = 10;
 
 const MEETING_TYPES: { value: MeetingType; label: string; description: string }[] = [
   { value: 'sales_discovery', label: 'Sales Discovery', description: 'Needs, objections, next steps, quotes' },
@@ -19,11 +22,60 @@ const MEETING_TYPES: { value: MeetingType; label: string; description: string }[
   { value: 'internal_sync', label: 'Internal Sync', description: 'Decisions, blockers, action items, owners' },
 ];
 
+interface HistoryEntry {
+  id: string;
+  title: string;
+  date: string;
+  meetingType: MeetingType;
+  markdown: string;
+  createdAt: string;
+}
+
+// 3.5 — Auto-detect meeting type from transcript content
+function detectMeetingType(text: string): MeetingType | null {
+  const sample = text.slice(0, 2000).toLowerCase();
+
+  const salesSignals = ['demo', 'pricing', 'proposal', 'prospect', 'pipeline', 'deal', 'contract', 'objection', 'competitor', 'budget', 'decision maker', 'close', 'discovery'];
+  const supportSignals = ['ticket', 'issue', 'bug', 'resolved', 'escalat', 'customer complaint', 'support', 'incident', 'workaround', 'SLA', 'outage', 'resolution'];
+  const internalSignals = ['standup', 'sprint', 'blocker', 'retro', 'planning', 'backlog', 'velocity', 'deploy', 'release', 'PR review', 'on track', 'update'];
+
+  const salesScore = salesSignals.filter((s) => sample.includes(s)).length;
+  const supportScore = supportSignals.filter((s) => sample.includes(s)).length;
+  const internalScore = internalSignals.filter((s) => sample.includes(s)).length;
+
+  const max = Math.max(salesScore, supportScore, internalScore);
+  if (max < 2) return null; // Not enough signal
+
+  if (salesScore === max) return 'sales_discovery';
+  if (supportScore === max) return 'customer_support';
+  return 'internal_sync';
+}
+
+// 3.6 — localStorage history helpers
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToHistory(entry: HistoryEntry) {
+  const history = loadHistory();
+  history.unshift(entry);
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
 export default function Home() {
+  const { toast } = useToast();
+
   // Input state
   const [transcript, setTranscript] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('sales_discovery');
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Metadata state
   const [showMetadata, setShowMetadata] = useState(false);
@@ -43,10 +95,16 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [summaryMarkdown, setSummaryMarkdown] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedMarkdown, setEditedMarkdown] = useState('');
   const [quality, setQuality] = useState<QualityResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [transcriptWarning, setTranscriptWarning] = useState<string | null>(null);
+
+  // History state
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // File parsing state
   const [isParsingFile, setIsParsingFile] = useState(false);
@@ -54,6 +112,11 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+
+  // Load history on mount
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
 
   // Check API key on load
   useEffect(() => {
@@ -67,7 +130,7 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Check transcript length
+  // Check transcript length + auto-detect meeting type
   useEffect(() => {
     if (transcript.length > MAX_TRANSCRIPT_CHARS) {
       setTranscriptWarning(
@@ -76,7 +139,49 @@ export default function Home() {
     } else {
       setTranscriptWarning(null);
     }
+
+    // 3.5 — Auto-detect on paste/upload (only if transcript just appeared)
+    if (transcript.length > 200) {
+      const detected = detectMeetingType(transcript);
+      if (detected && detected !== meetingType) {
+        setMeetingType(detected);
+        toast(`Auto-detected: ${MEETING_TYPES.find((t) => t.value === detected)?.label}`, 'success');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript]);
+
+  // 3.1 — Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setFileError(null);
+    setIsParsingFile(true);
+    try {
+      const text = await parseFile(file);
+      setTranscript(text);
+      toast(`Loaded ${file.name}`);
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : 'Failed to parse file.');
+      toast('Failed to parse file', 'error');
+    } finally {
+      setIsParsingFile(false);
+    }
+  }, [toast]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,6 +204,7 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     setSummaryMarkdown(null);
+    setIsEditing(false);
     setQuality(null);
     setWarnings([]);
     setProgress({ current: 0, total: 0 });
@@ -121,6 +227,18 @@ export default function Home() {
       setSummaryMarkdown(result.markdown);
       setWarnings(result.warnings);
 
+      // 3.6 — Save to localStorage history
+      const entry: HistoryEntry = {
+        id: Date.now().toString(),
+        title: title || `${MEETING_TYPES.find((t) => t.value === meetingType)?.label} Summary`,
+        date: date || new Date().toISOString().slice(0, 10),
+        meetingType,
+        markdown: result.markdown,
+        createdAt: new Date().toISOString(),
+      };
+      saveToHistory(entry);
+      setHistory(loadHistory());
+
       setTimeout(() => {
         summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -139,6 +257,7 @@ export default function Home() {
       } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      toast('Generation failed', 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -148,6 +267,7 @@ export default function Home() {
     setTranscript('');
     setFileName(null);
     setSummaryMarkdown(null);
+    setIsEditing(false);
     setQuality(null);
     setWarnings([]);
     setError(null);
@@ -160,7 +280,32 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const quotes = summaryMarkdown ? parseQuotes(summaryMarkdown) : [];
+  // 3.6 — Load a history entry
+  const handleLoadHistory = useCallback((entry: HistoryEntry) => {
+    setSummaryMarkdown(entry.markdown);
+    setTitle(entry.title);
+    setDate(entry.date);
+    setMeetingType(entry.meetingType);
+    setShowHistory(false);
+    setIsEditing(false);
+    setQuality(null);
+    toast(`Loaded: ${entry.title}`);
+  }, [toast]);
+
+  // 3.4 — Editable summary
+  const handleToggleEdit = useCallback(() => {
+    if (isEditing && summaryMarkdown) {
+      setSummaryMarkdown(editedMarkdown);
+      setIsEditing(false);
+      toast('Summary updated');
+    } else if (summaryMarkdown) {
+      setEditedMarkdown(summaryMarkdown);
+      setIsEditing(true);
+    }
+  }, [isEditing, summaryMarkdown, editedMarkdown, toast]);
+
+  const displayMarkdown = summaryMarkdown || '';
+  const quotes = displayMarkdown ? parseQuotes(displayMarkdown) : [];
 
   return (
     <main className="min-h-screen bg-white">
@@ -173,12 +318,43 @@ export default function Home() {
         )}
 
         {/* Header */}
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Meeting Intelligence</h1>
-        <p className="text-gray-500 mb-10">
-          Paste a transcript, choose a meeting type, get a structured summary.
-        </p>
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Meeting Intelligence</h1>
+            <p className="text-gray-500">
+              Paste a transcript, choose a meeting type, get a structured summary.
+            </p>
+          </div>
+          {/* 3.6 — History button */}
+          {history.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowHistory(!showHistory)}
+                className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                History ({history.length})
+              </button>
+              {showHistory && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+                  {history.map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => handleLoadHistory(entry)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    >
+                      <p className="text-sm font-medium text-gray-900 truncate">{entry.title}</p>
+                      <p className="text-xs text-gray-500">{entry.date} · {MEETING_TYPES.find((t) => t.value === entry.meetingType)?.label}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* Transcript Input */}
+        {/* 3.1 — Transcript Input with Drag & Drop */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <label htmlFor="transcript" className="text-sm font-medium text-gray-700">
@@ -205,13 +381,25 @@ export default function Home() {
               />
             </div>
           </div>
-          <textarea
-            id="transcript"
-            value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste your Teams meeting transcript here..."
-            className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
-          />
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`relative ${isDragging ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg' : ''}`}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-2 border-dashed border-blue-400 rounded-lg flex items-center justify-center z-10">
+                <p className="text-sm font-medium text-blue-600">Drop file here</p>
+              </div>
+            )}
+            <textarea
+              id="transcript"
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Paste your Teams meeting transcript here or drag & drop a .vtt, .txt, or .docx file..."
+              className="w-full min-h-[300px] p-4 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+            />
+          </div>
           {fileError && <p className="mt-2 text-sm text-red-600">{fileError}</p>}
           {transcriptWarning && <p className="mt-2 text-sm text-amber-600">{transcriptWarning}</p>}
         </div>
@@ -242,11 +430,7 @@ export default function Home() {
 
         {/* Optional Metadata */}
         <div className="mb-6">
-          <button
-            type="button"
-            onClick={() => setShowMetadata(!showMetadata)}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
+          <button type="button" onClick={() => setShowMetadata(!showMetadata)} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 font-medium">
             <svg className={`w-4 h-4 transition-transform ${showMetadata ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -276,11 +460,7 @@ export default function Home() {
 
         {/* Optional Chat Log */}
         <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => setShowChatLog(!showChatLog)}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
+          <button type="button" onClick={() => setShowChatLog(!showChatLog)} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 font-medium">
             <svg className={`w-4 h-4 transition-transform ${showChatLog ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -336,16 +516,34 @@ export default function Home() {
               onNewSummary={handleNewSummary}
             />
 
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Left: Rendered Markdown */}
-              <div className="lg:w-[60%] min-w-0">
-                <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-200 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:text-gray-700">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {summaryMarkdown}
-                  </ReactMarkdown>
-                </div>
+            {/* 3.4 — Edit toggle */}
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={handleToggleEdit}
+                className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+              >
+                {isEditing ? 'Save edits' : 'Edit summary'}
+              </button>
+            </div>
 
-                {/* Email Draft Panel */}
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Left: Rendered or Editable Markdown */}
+              <div className="lg:w-[60%] min-w-0">
+                {isEditing ? (
+                  <textarea
+                    value={editedMarkdown}
+                    onChange={(e) => setEditedMarkdown(e.target.value)}
+                    className="w-full min-h-[600px] p-4 border border-gray-300 rounded-lg text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-headings:font-semibold prose-h2:text-lg prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-table:text-sm prose-th:bg-gray-50 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-medium prose-th:text-gray-700 prose-td:px-3 prose-td:py-2 prose-td:border-t prose-td:border-gray-200 prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-1 prose-blockquote:text-gray-700">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {summaryMarkdown}
+                    </ReactMarkdown>
+                  </div>
+                )}
+
                 <EmailDraftPanel markdown={summaryMarkdown} />
               </div>
 

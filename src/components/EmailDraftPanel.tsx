@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useToast } from '@/components/Toast';
 
 interface EmailDraftPanelProps {
   markdown: string;
@@ -17,15 +18,14 @@ function extractEmailDraft(markdown: string): string {
 }
 
 export default function EmailDraftPanel({ markdown }: EmailDraftPanelProps) {
-  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
   const emailDraft = extractEmailDraft(markdown);
 
   const handleCopy = useCallback(async () => {
     if (!emailDraft) return;
     await navigator.clipboard.writeText(emailDraft);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [emailDraft]);
+    toast('Email draft copied to clipboard');
+  }, [emailDraft, toast]);
 
   if (!emailDraft) return null;
 
@@ -38,7 +38,7 @@ export default function EmailDraftPanel({ markdown }: EmailDraftPanelProps) {
           onClick={handleCopy}
           className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
-          {copied ? 'Copied!' : 'Copy Email'}
+          Copy Email
         </button>
       </div>
       <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
