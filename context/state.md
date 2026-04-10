@@ -106,7 +106,9 @@ Last updated: 2025-04-05
   - `scripts/setup-make.ts` — auto-discovers team/connection, creates 2 scenarios with webhooks
   - Scenarios: "MI – Save Summary to SharePoint" + "MI – Post Summary to Teams Channel"
   - Set Variable maps meetingType to folder path (/Sales/, /Support/, /Internal/)
-  - Next: add SharePoint/Teams modules in Make UI, add "Send" buttons in app
+  - "Send to SharePoint" and "Send to Teams" buttons in export toolbar
+  - Buttons POST structured JSON (meetingType, title, date, markdown, filename) to Make webhooks
+  - Only appear when NEXT_PUBLIC_MAKE_*_WEBHOOK_URL env vars are configured
 
 ## What Is Next
 
